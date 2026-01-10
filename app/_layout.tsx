@@ -1,6 +1,8 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Provider } from "react-redux";
 import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
+import { store } from "../store";
 
 function RootLayoutNav() {
   const { theme } = useTheme();
@@ -15,8 +17,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <RootLayoutNav />
-    </ThemeProvider>
+    <Provider store={store}>
+      <ThemeProvider>
+        <RootLayoutNav />
+      </ThemeProvider>
+    </Provider>
   );
 }
