@@ -156,7 +156,7 @@ export default function LoginScreen() {
                 <Ionicons name="logo-google" size={24} color="#db4437" />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.socialButton, dynamicStyles.socialButton]}>
-                <Ionicons name="logo-apple" size={24} color={theme.isDark ? "#fff" : "#000"} />
+                <Ionicons name="logo-apple" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
 
