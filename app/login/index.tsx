@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -15,22 +18,92 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { clearError, loginAsync } from "../../store/slices/authSlice";
+
+const REMEMBER_EMAIL_KEY = "remembered_email";
+const REMEMBER_PASSWORD_KEY = "remembered_password";
 
 export default function LoginScreen() {
   const { theme } = useTheme();
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
 
-  const handleLogin = () => {
-    if (!phone.trim() || !password.trim()) {
+  // Load remembered credentials on mount
+  useEffect(() => {
+    const loadRememberedCredentials = async () => {
+      try {
+        const rememberedEmail = await AsyncStorage.getItem(REMEMBER_EMAIL_KEY);
+        const rememberedPassword = await AsyncStorage.getItem(REMEMBER_PASSWORD_KEY);
+        
+        if (rememberedEmail && rememberedPassword) {
+          setEmail(rememberedEmail);
+          setPassword(rememberedPassword);
+          setRememberMe(true);
+        }
+      } catch (error) {
+        console.error("Error loading remembered credentials:", error);
+      }
+    };
+
+    loadRememberedCredentials();
+  }, []);
+
+  // Navigate to tabs when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace("/(tabs)");
+    }
+  }, [isAuthenticated, router]);
+
+  // Show error alert when there's an error
+  useEffect(() => {
+    if (error) {
+      Alert.alert("Lỗi đăng nhập", error, [
+        {
+          text: "OK",
+          onPress: () => dispatch(clearError()),
+        },
+      ]);
+    }
+  }, [error, dispatch]);
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
       Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
     }
 
-    // Navigate to tabs home
-    router.replace("/(tabs)");
+    // Dispatch login action
+    const result = await dispatch(
+      loginAsync({
+        email: email.trim(),
+        password: password.trim(),
+      })
+    );
+
+    // Save credentials if remember me is checked and login successful
+    if (rememberMe && loginAsync.fulfilled.match(result)) {
+      try {
+        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, email.trim());
+        await AsyncStorage.setItem(REMEMBER_PASSWORD_KEY, password.trim());
+      } catch (error) {
+        console.error("Error saving remembered credentials:", error);
+      }
+    } else if (!rememberMe) {
+      // Clear saved credentials if remember me is unchecked
+      try {
+        await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
+        await AsyncStorage.removeItem(REMEMBER_PASSWORD_KEY);
+      } catch (error) {
+        console.error("Error clearing remembered credentials:", error);
+      }
+    }
   };
 
   const dynamicStyles = {
@@ -72,32 +145,29 @@ export default function LoginScreen() {
         >
           <View style={[styles.content, dynamicStyles.content]}>
           {/* Logo/Title Section */}
-          <View style={styles.header}>
-            <View style={[styles.logoContainer, dynamicStyles.logoContainer]}>
-              <Ionicons name="storefront" size={60} color={theme.colors.primary} />
-            </View>
-            <Text style={[styles.title, dynamicStyles.title]}>Shoppe</Text>
-            <Text style={[styles.subtitle, dynamicStyles.subtitle]}>Đăng nhập để tiếp tục</Text>
+          <View style={styles.header}>         
+              <Image source={require("../../assets/images/logo.png")} style={styles.logoContainer} />                  
           </View>
 
           {/* Form Section */}
           <View style={styles.form}>
-            {/* Phone Input */}
+            {/* Email Input */}
             <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
               <Ionicons
-                name="call-outline"
+                name="mail-outline"
                 size={20}
                 color={theme.colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={[styles.input, dynamicStyles.input]}
-                placeholder="Số điện thoại"
+                placeholder="Email"
                 placeholderTextColor={theme.colors.inputPlaceholder}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
               />
             </View>
 
@@ -130,14 +200,49 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Remember Me Checkbox */}
+            <View style={styles.rememberMeContainer}>
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => setRememberMe(!rememberMe)}
+              >
+                <View style={[
+                  styles.checkbox,
+                  rememberMe && { backgroundColor: theme.colors.primary },
+                  !rememberMe && { borderColor: theme.colors.border, borderWidth: 2 }
+                ]}>
+                  {rememberMe && (
+                    <Ionicons name="checkmark" size={16} color="#fff" />
+                  )}
+                </View>
+                <Text style={[styles.rememberMeText, { color: theme.colors.textSecondary }]}>
+                  Nhớ tài khoản
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Forgot Password */}
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={[styles.forgotPasswordText, dynamicStyles.forgotPasswordText]}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 
             {/* Login Button */}
-            <TouchableOpacity style={[styles.loginButton, dynamicStyles.loginButton]} onPress={handleLogin}>
-              <Text style={[styles.loginButtonText, dynamicStyles.loginButtonText]}>Đăng nhập</Text>
+            <TouchableOpacity
+              style={[
+                styles.loginButton,
+                dynamicStyles.loginButton,
+                loading && styles.loginButtonDisabled,
+              ]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={[styles.loginButtonText, dynamicStyles.loginButtonText]}>
+                  Đăng nhập
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Divider */}
@@ -189,16 +294,12 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    marginBottom: 48,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
+    width: 200,
+    height: 200,
     borderRadius: 50,
-    backgroundColor: "#fff5f3",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
+    alignItems: "center",  
   },
   title: {
     fontSize: 32,
@@ -228,6 +329,24 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 4,
+  },
+  rememberMeContainer: {
+    marginBottom: 16,
+  },
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    marginRight: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  rememberMeText: {
+    fontSize: 14,
   },
   forgotPassword: {
     alignSelf: "flex-end",
@@ -293,5 +412,8 @@ const styles = StyleSheet.create({
   signUpLink: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  loginButtonDisabled: {
+    opacity: 0.6,
   },
 });
