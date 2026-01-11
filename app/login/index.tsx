@@ -32,7 +32,7 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { loading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { loading, error, isAuthenticated, user } = useAppSelector((state) => state.auth);
 
   // Load remembered credentials on mount
   useEffect(() => {
@@ -54,12 +54,17 @@ export default function LoginScreen() {
     loadRememberedCredentials();
   }, []);
 
-  // Navigate to tabs when authenticated
+  // Navigate to tabs or interest screen when authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace("/(tabs)");
+      // Check if user has interests set
+      if (user?.interests && user.interests.length > 0) {
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/interest");
+      }
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user, router]);
 
   // Show error alert when there's an error
   useEffect(() => {
