@@ -7,7 +7,7 @@ import { loadAuthFromStorage } from "../store/slices/authSlice";
 
 export default function Index() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, loading } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, loading, user } = useAppSelector((state) => state.auth);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -26,7 +26,12 @@ export default function Index() {
 
   // Redirect based on authentication status
   if (isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
+    // Check if user has interests set
+    if (user?.interests && user.interests.length > 0) {
+      return <Redirect href="/(tabs)" />;
+    } else {
+      return <Redirect href="/interest" />;
+    }
   }
 
   return <Redirect href="/login" />;
