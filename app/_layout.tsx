@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Provider } from "react-redux";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { store } from "../store";
 
@@ -15,10 +16,12 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <Provider store={store}>
-      <ThemeProvider>
-        <RootLayoutNav />
-      </ThemeProvider>
-    </Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Provider store={store}>
+        <ThemeProvider>
+          <RootLayoutNav />
+        </ThemeProvider>
+      </Provider>
+    </GestureHandlerRootView>
   );
 }
