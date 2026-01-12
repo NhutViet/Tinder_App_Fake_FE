@@ -2,52 +2,30 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { API_BASE_URL } from '../constants';
 import { RootState } from '../index';
 
-// Types matching backend schema
-export enum Gender {
-  MALE = 'male',
-  FEMALE = 'female',
-  OTHER = 'other',
-}
-
-export enum InterestedIn {
-  MALE = 'male',
-  FEMALE = 'female',
-  ALL = 'all',
-}
-
+// Types
 export interface User {
   _id?: string;
-  name: string;
-  email: string;
-  password?: string;
-  gender: Gender;
-  interestedIn: InterestedIn;
-  birthDate: string | Date;
+  email?: string;
+  name?: string;
+  phone?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  interestedIn?: 'ALL' | 'MALE' | 'FEMALE';
+  interests?: string[];
+  age?: number;
   bio?: string;
   photos?: string[];
-  interests?: string[];
-  location?: {
-    lat: number;
-    lng: number;
-  };
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
+  [key: string]: any;
 }
 
 export interface UpdateUserDto {
   name?: string;
-  email?: string;
-  password?: string;
-  gender?: Gender;
-  interestedIn?: InterestedIn;
-  birthDate?: string | Date;
+  phone?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  interestedIn?: 'ALL' | 'MALE' | 'FEMALE';
+  age?: number;
   bio?: string;
   photos?: string[];
-  interests?: string[];
-  location?: {
-    lat: number;
-    lng: number;
-  };
+  [key: string]: any;
 }
 
 export interface UpdateInterestsDto {
@@ -55,54 +33,43 @@ export interface UpdateInterestsDto {
 }
 
 interface UserState {
-  currentProfile: User | null;
+  currentUser: User | null;
   swipeCandidates: User[];
-  selectedUser: User | null;
+  homeCandidates: User[];
+  selectedProfile: User | null;
   loading: boolean;
   error: string | null;
-  hasMoreCandidates: boolean;
 }
 
 const initialState: UserState = {
-  currentProfile: null,
+  currentUser: null,
   swipeCandidates: [],
-  selectedUser: null,
+  homeCandidates: [],
+  selectedProfile: null,
   loading: false,
   error: null,
-  hasMoreCandidates: true,
 };
 
-// Helper function to get auth token from state
-const getAuthToken = (state: RootState): string | null => {
-  return state.auth.token;
+// Helper function to get auth token
+const getAuthToken = (): string | null => {
+  // Get token from AsyncStorage or from auth state
+  // In a real app, you might want to get it from the auth slice
+  return null; // Will be handled by passing token from component
 };
 
 // Async Thunks
-export const getUsersForSwipeAsync = createAsyncThunk(
-  'user/getUsersForSwipe',
-  async (
-    params: { swipedIds?: string[]; limit?: number },
-    { getState, rejectWithValue }
-  ) => {
+export const fetchUsersAsync = createAsyncThunk(
+  'user/fetchUsers',
+  async (_, { rejectWithValue, getState }) => {
     try {
       const state = getState() as RootState;
-      const token = getAuthToken(state);
+      const token = state.auth.token;
 
       if (!token) {
         return rejectWithValue('Không có token xác thực');
       }
 
-      const queryParams = new URLSearchParams();
-      if (params.swipedIds && params.swipedIds.length > 0) {
-        queryParams.append('swipedIds', params.swipedIds.join(','));
-      }
-      if (params.limit) {
-        queryParams.append('limit', params.limit.toString());
-      }
-
-      const url = `${API_BASE_URL}/users/swipe/candidates${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-
-      const response = await fetch(url, {
+      const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -128,49 +95,12 @@ export const getUsersForSwipeAsync = createAsyncThunk(
   }
 );
 
-export const getProfileForSwipeAsync = createAsyncThunk(
-  'user/getProfileForSwipe',
-  async (userId: string, { getState, rejectWithValue }) => {
+export const fetchUserByIdAsync = createAsyncThunk(
+  'user/fetchUserById',
+  async (userId: string, { rejectWithValue, getState }) => {
     try {
       const state = getState() as RootState;
-      const token = getAuthToken(state);
-
-      if (!token) {
-        return rejectWithValue('Không có token xác thực');
-      }
-
-      const response = await fetch(`${API_BASE_URL}/users/swipe/profile/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
-          message: 'Không thể lấy thông tin người dùng',
-        }));
-        return rejectWithValue(errorData.message || 'Không thể lấy thông tin người dùng');
-      }
-
-      const user: User = await response.json();
-      return user;
-    } catch (error: any) {
-      if (error.message === 'Network request failed' || error.message?.includes('Network')) {
-        return rejectWithValue('Không thể kết nối đến server');
-      }
-      return rejectWithValue(error.message || 'Lỗi kết nối đến server');
-    }
-  }
-);
-
-export const getUserByIdAsync = createAsyncThunk(
-  'user/getUserById',
-  async (userId: string, { getState, rejectWithValue }) => {
-    try {
-      const state = getState() as RootState;
-      const token = getAuthToken(state);
+      const token = state.auth.token;
 
       if (!token) {
         return rejectWithValue('Không có token xác thực');
@@ -206,11 +136,11 @@ export const updateUserAsync = createAsyncThunk(
   'user/updateUser',
   async (
     { userId, updateUserDto }: { userId: string; updateUserDto: UpdateUserDto },
-    { getState, rejectWithValue }
+    { rejectWithValue, getState }
   ) => {
     try {
       const state = getState() as RootState;
-      const token = getAuthToken(state);
+      const token = state.auth.token;
 
       if (!token) {
         return rejectWithValue('Không có token xác thực');
@@ -243,15 +173,190 @@ export const updateUserAsync = createAsyncThunk(
   }
 );
 
+export const deleteUserAsync = createAsyncThunk(
+  'user/deleteUser',
+  async (userId: string, { rejectWithValue, getState }) => {
+    try {
+      const state = getState() as RootState;
+      const token = state.auth.token;
+
+      if (!token) {
+        return rejectWithValue('Không có token xác thực');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          message: 'Không thể xóa người dùng',
+        }));
+        return rejectWithValue(errorData.message || 'Không thể xóa người dùng');
+      }
+
+      return userId;
+    } catch (error: any) {
+      if (error.message === 'Network request failed' || error.message?.includes('Network')) {
+        return rejectWithValue('Không thể kết nối đến server');
+      }
+      return rejectWithValue(error.message || 'Lỗi kết nối đến server');
+    }
+  }
+);
+
+export const getUsersForSwipeAsync = createAsyncThunk(
+  'user/getUsersForSwipe',
+  async (
+    { swipedIds, limit }: { swipedIds?: string[]; limit?: number } = {},
+    { rejectWithValue, getState }
+  ) => {
+    try {
+      const state = getState() as RootState;
+      const token = state.auth.token;
+
+      if (!token) {
+        return rejectWithValue('Không có token xác thực');
+      }
+
+      const swipedIdsParam = swipedIds && swipedIds.length > 0 ? swipedIds.join(',') : '';
+      const limitParam = limit || 10;
+      const queryParams = new URLSearchParams();
+      if (swipedIdsParam) queryParams.append('swipedIds', swipedIdsParam);
+      queryParams.append('limit', limitParam.toString());
+
+      const response = await fetch(
+        `${API_BASE_URL}/users/swipe/candidates?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          message: 'Không thể lấy danh sách người dùng để swipe',
+        }));
+        return rejectWithValue(
+          errorData.message || 'Không thể lấy danh sách người dùng để swipe'
+        );
+      }
+
+      const users: User[] = await response.json();
+      return users;
+    } catch (error: any) {
+      if (error.message === 'Network request failed' || error.message?.includes('Network')) {
+        return rejectWithValue('Không thể kết nối đến server');
+      }
+      return rejectWithValue(error.message || 'Lỗi kết nối đến server');
+    }
+  }
+);
+
+export const getProfileForSwipeAsync = createAsyncThunk(
+  'user/getProfileForSwipe',
+  async (userId: string, { rejectWithValue, getState }) => {
+    try {
+      const state = getState() as RootState;
+      const token = state.auth.token;
+
+      if (!token) {
+        return rejectWithValue('Không có token xác thực');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/swipe/profile/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          message: 'Không thể lấy profile người dùng',
+        }));
+        return rejectWithValue(errorData.message || 'Không thể lấy profile người dùng');
+      }
+
+      const user: User = await response.json();
+      return user;
+    } catch (error: any) {
+      if (error.message === 'Network request failed' || error.message?.includes('Network')) {
+        return rejectWithValue('Không thể kết nối đến server');
+      }
+      return rejectWithValue(error.message || 'Lỗi kết nối đến server');
+    }
+  }
+);
+
+export const getUsersForHomeAsync = createAsyncThunk(
+  'user/getUsersForHome',
+  async (
+    { swipedIds, limit }: { swipedIds?: string[]; limit?: number } = {},
+    { rejectWithValue, getState }
+  ) => {
+    try {
+      const state = getState() as RootState;
+      const token = state.auth.token;
+
+      if (!token) {
+        return rejectWithValue('Không có token xác thực');
+      }
+
+      const swipedIdsParam = swipedIds && swipedIds.length > 0 ? swipedIds.join(',') : '';
+      const limitParam = limit || 20;
+      const queryParams = new URLSearchParams();
+      if (swipedIdsParam) queryParams.append('swipedIds', swipedIdsParam);
+      queryParams.append('limit', limitParam.toString());
+
+      const response = await fetch(
+        `${API_BASE_URL}/users/home/candidates?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({
+          message: 'Không thể lấy danh sách người dùng cho trang home',
+        }));
+        return rejectWithValue(
+          errorData.message || 'Không thể lấy danh sách người dùng cho trang home'
+        );
+      }
+
+      const users: User[] = await response.json();
+      return users;
+    } catch (error: any) {
+      if (error.message === 'Network request failed' || error.message?.includes('Network')) {
+        return rejectWithValue('Không thể kết nối đến server');
+      }
+      return rejectWithValue(error.message || 'Lỗi kết nối đến server');
+    }
+  }
+);
+
 export const updateInterestsAsync = createAsyncThunk(
   'user/updateInterests',
   async (
     { userId, interests }: { userId: string; interests: string[] },
-    { getState, rejectWithValue }
+    { rejectWithValue, getState }
   ) => {
     try {
       const state = getState() as RootState;
-      const token = getAuthToken(state);
+      const token = state.auth.token;
 
       if (!token) {
         return rejectWithValue('Không có token xác thực');
@@ -294,21 +399,88 @@ const userSlice = createSlice({
     },
     clearSwipeCandidates: (state) => {
       state.swipeCandidates = [];
-      state.hasMoreCandidates = true;
+    },
+    clearHomeCandidates: (state) => {
+      state.homeCandidates = [];
+    },
+    clearSelectedProfile: (state) => {
+      state.selectedProfile = null;
+    },
+    setCurrentUser: (state, action: PayloadAction<User>) => {
+      state.currentUser = action.payload;
     },
     removeSwipeCandidate: (state, action: PayloadAction<string>) => {
       state.swipeCandidates = state.swipeCandidates.filter(
         (user) => user._id !== action.payload
       );
     },
-    setSelectedUser: (state, action: PayloadAction<User | null>) => {
-      state.selectedUser = action.payload;
-    },
-    clearSelectedUser: (state) => {
-      state.selectedUser = null;
-    },
   },
   extraReducers: (builder) => {
+    // Fetch Users
+    builder
+      .addCase(fetchUsersAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUsersAsync.fulfilled, (state, action) => {
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(fetchUsersAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Fetch User By Id
+    builder
+      .addCase(fetchUserByIdAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserByIdAsync.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentUser = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchUserByIdAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Update User
+    builder
+      .addCase(updateUserAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateUserAsync.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentUser = action.payload;
+        state.error = null;
+      })
+      .addCase(updateUserAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Delete User
+    builder
+      .addCase(deleteUserAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteUserAsync.fulfilled, (state, action) => {
+        state.loading = false;
+        if (state.currentUser?._id === action.payload) {
+          state.currentUser = null;
+        }
+        state.error = null;
+      })
+      .addCase(deleteUserAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
     // Get Users For Swipe
     builder
       .addCase(getUsersForSwipeAsync.pending, (state) => {
@@ -317,14 +489,7 @@ const userSlice = createSlice({
       })
       .addCase(getUsersForSwipeAsync.fulfilled, (state, action) => {
         state.loading = false;
-        // Append new candidates to existing ones
-        const newCandidates = action.payload;
-        const existingIds = new Set(state.swipeCandidates.map((u) => u._id));
-        const uniqueNewCandidates = newCandidates.filter(
-          (u) => u._id && !existingIds.has(u._id)
-        );
-        state.swipeCandidates = [...state.swipeCandidates, ...uniqueNewCandidates];
-        state.hasMoreCandidates = newCandidates.length > 0;
+        state.swipeCandidates = action.payload;
         state.error = null;
       })
       .addCase(getUsersForSwipeAsync.rejected, (state, action) => {
@@ -340,7 +505,7 @@ const userSlice = createSlice({
       })
       .addCase(getProfileForSwipeAsync.fulfilled, (state, action) => {
         state.loading = false;
-        state.selectedUser = action.payload;
+        state.selectedProfile = action.payload;
         state.error = null;
       })
       .addCase(getProfileForSwipeAsync.rejected, (state, action) => {
@@ -348,38 +513,18 @@ const userSlice = createSlice({
         state.error = action.payload as string;
       });
 
-    // Get User By Id
+    // Get Users For Home
     builder
-      .addCase(getUserByIdAsync.pending, (state) => {
+      .addCase(getUsersForHomeAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getUserByIdAsync.fulfilled, (state, action) => {
+      .addCase(getUsersForHomeAsync.fulfilled, (state, action) => {
         state.loading = false;
-        state.selectedUser = action.payload;
+        state.homeCandidates = action.payload;
         state.error = null;
       })
-      .addCase(getUserByIdAsync.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      });
-
-    // Update User
-    builder
-      .addCase(updateUserAsync.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(updateUserAsync.fulfilled, (state, action) => {
-        state.loading = false;
-        state.currentProfile = action.payload;
-        // Update selected user if it's the same user
-        if (state.selectedUser?._id === action.payload._id) {
-          state.selectedUser = action.payload;
-        }
-        state.error = null;
-      })
-      .addCase(updateUserAsync.rejected, (state, action) => {
+      .addCase(getUsersForHomeAsync.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
@@ -392,11 +537,7 @@ const userSlice = createSlice({
       })
       .addCase(updateInterestsAsync.fulfilled, (state, action) => {
         state.loading = false;
-        state.currentProfile = action.payload;
-        // Update selected user if it's the same user
-        if (state.selectedUser?._id === action.payload._id) {
-          state.selectedUser = action.payload;
-        }
+        state.currentUser = action.payload;
         state.error = null;
       })
       .addCase(updateInterestsAsync.rejected, (state, action) => {
@@ -409,9 +550,10 @@ const userSlice = createSlice({
 export const {
   clearError,
   clearSwipeCandidates,
+  clearHomeCandidates,
+  clearSelectedProfile,
+  setCurrentUser,
   removeSwipeCandidate,
-  setSelectedUser,
-  clearSelectedUser,
 } = userSlice.actions;
 
 export default userSlice.reducer;

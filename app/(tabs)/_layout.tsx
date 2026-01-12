@@ -17,7 +17,7 @@ export default function TabsLayout() {
           backgroundColor: theme.colors.background,
           paddingBottom: 5,
           paddingTop: 5,
-          height: 60,
+          height: 80,
         },
       }}
     >
